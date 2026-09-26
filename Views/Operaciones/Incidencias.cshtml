@@ -1,0 +1,44 @@
+@model IncidenciasViewModel
+@{
+    ViewData["Title"] = "Incidencias";
+}
+
+<h1>Incidencias abiertas</h1>
+
+@if (Model.Incidencias.Count == 0)
+{
+    <p>No hay incidencias abiertas.</p>
+}
+else
+{
+    <table class="table table-striped" id="tabla-incidencias">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Estacion</th>
+                <th>Descripcion</th>
+                <th>Fecha apertura</th>
+                <th>Estado</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var incidencia in Model.Incidencias)
+            {
+                <tr data-incidencia-id="@incidencia.Id">
+                    <td>@incidencia.Id</td>
+                    <td>@incidencia.Estacion</td>
+                    <td>@incidencia.Descripcion</td>
+                    <td>@incidencia.FechaApertura.ToString("dd/MM/yyyy HH:mm")</td>
+                    <td>@incidencia.Estado</td>
+                    <td>
+                        <form asp-controller="Operaciones" asp-action="Cerrar" method="post" class="d-inline">
+                            <input type="hidden" name="id" value="@incidencia.Id" />
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Cerrar</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

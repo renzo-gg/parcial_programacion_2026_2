@@ -1,0 +1,29 @@
+## .NET / Visual Studio
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+.vs/
+*.user
+*.suo
+*.userprefs
+*.DotSettings.user
+
+## Base de datos SQLite (nunca versionar el archivo .db)
+App_Data/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+## Secretos y variables de entorno (solo en Render / local user-secrets)
+appsettings.Production.json
+appsettings.*.local.json
+.env
+.env.*
+secrets.json
+
+## Sistema operativo / editores
+Thumbs.db
+.DS_Store
