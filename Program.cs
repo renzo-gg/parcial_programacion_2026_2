@@ -9,6 +9,9 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("IncidenciasDb")));
 
+// Singleton: el indice en memoria debe sobrevivir entre requests.
+builder.Services.AddSingleton<IAlgoliaService, AlgoliaService>();
+
 builder.Services.AddScoped<IIncidenciasService, IncidenciasService>();
 
 var redisConnectionString = builder.Configuration["Redis:ConnectionString"]
@@ -64,6 +67,10 @@ using (var scope = app.Services.CreateScope())
     logger.LogInformation(
         "Cache distribuido: {Proveedor}",
         string.IsNullOrWhiteSpace(redisConnectionString) ? "memoria (REDIS_CONNECTION no configurada)" : "Redis");
+
+    var algoliaService = scope.ServiceProvider.GetRequiredService<IAlgoliaService>();
+
+    await algoliaService.IndexarAsync(await context.Incidencias.ToListAsync());
 }
 
 app.Run();

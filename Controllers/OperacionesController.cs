@@ -14,11 +14,12 @@ public class OperacionesController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> Incidencias()
+    public async Task<IActionResult> Incidencias(string? q)
     {
         var model = new IncidenciasViewModel
         {
-            Incidencias = await _incidenciasService.GetAbiertasAsync()
+            Incidencias = await _incidenciasService.BuscarAsync(q),
+            TextoBusqueda = q ?? string.Empty
         };
 
         return View(model);

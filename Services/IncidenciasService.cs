@@ -13,15 +13,18 @@ public class IncidenciasService : IIncidenciasService
     private static readonly TimeSpan ExpiracionListado = TimeSpan.FromSeconds(60);
 
     private readonly ApplicationDbContext _context;
+    private readonly IAlgoliaService _algoliaService;
     private readonly IDistributedCache _cache;
     private readonly ILogger<IncidenciasService> _logger;
 
     public IncidenciasService(
         ApplicationDbContext context,
+        IAlgoliaService algoliaService,
         IDistributedCache cache,
         ILogger<IncidenciasService> logger)
     {
         _context = context;
+        _algoliaService = algoliaService;
         _cache = cache;
         _logger = logger;
     }
@@ -52,6 +55,28 @@ public class IncidenciasService : IIncidenciasService
             new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = ExpiracionListado });
 
         return listado;
+    }
+
+    public async Task<List<Incidencia>> BuscarAsync(string? texto)
+    {
+        if (string.IsNullOrWhiteSpace(texto))
+        {
+            return await GetAbiertasAsync();
+        }
+
+        _logger.LogInformation("Busqueda con termino: omite la cache de Redis y consulta Algolia + Base de Datos");
+
+        var ids = await _algoliaService.BuscarIdsAsync(texto);
+
+        if (ids.Count == 0)
+        {
+            return new List<Incidencia>();
+        }
+
+        return await _context.Incidencias
+            .Where(i => ids.Contains(i.Id) && i.Estado == EstadoIncidencia.Abierta)
+            .OrderBy(i => i.FechaApertura)
+            .ToListAsync();
     }
 
     public async Task<bool> CerrarAsync(int id)
