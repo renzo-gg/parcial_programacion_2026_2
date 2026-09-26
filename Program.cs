@@ -1,13 +1,18 @@
 using Microsoft.EntityFrameworkCore;
 using ParcialProgramacion.Data;
+using ParcialProgramacion.Hubs;
 using ParcialProgramacion.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllersWithViews();
 
+builder.Services.AddSignalR();
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("IncidenciasDb")));
+
+builder.Services.AddScoped<IIncidenciasNotificador, IncidenciasNotificador>();
 
 builder.Services.AddScoped<IIncidenciasService, IncidenciasService>();
 
@@ -26,6 +31,8 @@ app.UseAuthorization();
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Operaciones}/{action=Incidencias}/{id?}");
+
+app.MapHub<IncidenciasHub>(IncidenciasHub.Ruta);
 
 using (var scope = app.Services.CreateScope())
 {
