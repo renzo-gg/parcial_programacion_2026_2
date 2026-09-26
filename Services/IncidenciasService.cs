@@ -1,4 +1,6 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 using ParcialProgramacion.Data;
 using ParcialProgramacion.Models;
 
@@ -6,28 +8,53 @@ namespace ParcialProgramacion.Services;
 
 public class IncidenciasService : IIncidenciasService
 {
+    public const string ClaveListadoAbiertas = "operaciones:incidencias:abiertas";
+
+    private static readonly TimeSpan ExpiracionListado = TimeSpan.FromSeconds(60);
+
     private readonly ApplicationDbContext _context;
     private readonly IAlgoliaService _algoliaService;
+    private readonly IDistributedCache _cache;
     private readonly ILogger<IncidenciasService> _logger;
 
     public IncidenciasService(
         ApplicationDbContext context,
         IAlgoliaService algoliaService,
+        IDistributedCache cache,
         ILogger<IncidenciasService> logger)
     {
         _context = context;
         _algoliaService = algoliaService;
+        _cache = cache;
         _logger = logger;
     }
 
     public async Task<List<Incidencia>> GetAbiertasAsync()
     {
-        _logger.LogInformation("Origen de lectura: BD");
+        var cacheado = await _cache.GetAsync(ClaveListadoAbiertas);
 
-        return await _context.Incidencias
-            .Where(i => i.Estado == EstadoIncidencia.Abierta)
-            .OrderBy(i => i.FechaApertura)
-            .ToListAsync();
+        if (cacheado is { Length: > 0 })
+        {
+            var desdeCache = JsonSerializer.Deserialize<List<Incidencia>>(cacheado);
+
+            if (desdeCache is not null)
+            {
+                _logger.LogInformation("Origen de lectura: Redis");
+
+                return desdeCache;
+            }
+        }
+
+        _logger.LogInformation("Origen de lectura: Base de Datos");
+
+        var listado = await ObtenerAbiertasDesdeBaseDeDatosAsync();
+
+        await _cache.SetAsync(
+            ClaveListadoAbiertas,
+            JsonSerializer.SerializeToUtf8Bytes(listado),
+            new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = ExpiracionListado });
+
+        return listado;
     }
 
     public async Task<List<Incidencia>> BuscarAsync(string? texto)
@@ -36,6 +63,8 @@ public class IncidenciasService : IIncidenciasService
         {
             return await GetAbiertasAsync();
         }
+
+        _logger.LogInformation("Busqueda con termino: omite la cache de Redis y consulta Algolia + Base de Datos");
 
         var ids = await _algoliaService.BuscarIdsAsync(texto);
 
@@ -66,6 +95,21 @@ public class IncidenciasService : IIncidenciasService
 
         _logger.LogInformation("Incidencia {Id} cerrada en BD", id);
 
+        await InvalidarCacheListadoAsync();
+
         return true;
+    }
+
+    private async Task<List<Incidencia>> ObtenerAbiertasDesdeBaseDeDatosAsync() =>
+        await _context.Incidencias
+            .Where(i => i.Estado == EstadoIncidencia.Abierta)
+            .OrderBy(i => i.FechaApertura)
+            .ToListAsync();
+
+    private async Task InvalidarCacheListadoAsync()
+    {
+        await _cache.RemoveAsync(ClaveListadoAbiertas);
+
+        _logger.LogInformation("Cache invalidada: {Clave}", ClaveListadoAbiertas);
     }
 }

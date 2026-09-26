@@ -14,6 +14,22 @@ builder.Services.AddSingleton<IAlgoliaService, AlgoliaService>();
 
 builder.Services.AddScoped<IIncidenciasService, IncidenciasService>();
 
+var redisConnectionString = builder.Configuration["Redis:ConnectionString"]
+    ?? builder.Configuration["REDIS_CONNECTION"];
+
+if (!string.IsNullOrWhiteSpace(redisConnectionString))
+{
+    builder.Services.AddStackExchangeRedisCache(options =>
+    {
+        options.Configuration = redisConnectionString;
+        options.InstanceName = "parcial:";
+    });
+}
+else
+{
+    builder.Services.AddDistributedMemoryCache();
+}
+
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
@@ -45,6 +61,12 @@ using (var scope = app.Services.CreateScope())
     }
 
     context.Database.EnsureCreated();
+
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+    logger.LogInformation(
+        "Cache distribuido: {Proveedor}",
+        string.IsNullOrWhiteSpace(redisConnectionString) ? "memoria (REDIS_CONNECTION no configurada)" : "Redis");
 
     var algoliaService = scope.ServiceProvider.GetRequiredService<IAlgoliaService>();
 
