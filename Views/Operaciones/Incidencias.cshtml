@@ -3,11 +3,31 @@
     ViewData["Title"] = "Incidencias";
 }
 
-<h1>Incidencias abiertas</h1>
+<h1>Incidencias abiertas encontradas</h1>
+
+<form asp-controller="Operaciones" asp-action="Incidencias" method="get" class="mb-3" id="form-busqueda">
+    <div class="input-group">
+        <input type="search" name="q" id="q" value="@Model.TextoBusqueda" class="form-control"
+               placeholder="Buscar por estacion o descripcion" aria-label="Buscar por estacion o descripcion" />
+        <button type="submit" class="btn btn-primary">Buscar</button>
+        @if (Model.HayBusqueda)
+        {
+            <a asp-controller="Operaciones" asp-action="Incidencias" class="btn btn-outline-secondary">Limpiar</a>
+        }
+    </div>
+</form>
+
+@if (Model.HayBusqueda)
+{
+    <p id="resumen-busqueda">
+        @Model.Incidencias.Count coincidencia(s) para <strong>@Model.TextoBusqueda</strong>.
+        Solo se muestran incidencias abiertas existentes en la base de datos.
+    </p>
+}
 
 @if (Model.Incidencias.Count == 0)
 {
-    <p>No hay incidencias abiertas.</p>
+    <p id="sin-resultados">No hay incidencias abiertas para mostrar.</p>
 }
 else
 {

@@ -9,6 +9,9 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("IncidenciasDb")));
 
+// Singleton: el indice en memoria debe sobrevivir entre requests.
+builder.Services.AddSingleton<IAlgoliaService, AlgoliaService>();
+
 builder.Services.AddScoped<IIncidenciasService, IncidenciasService>();
 
 var app = builder.Build();
@@ -42,6 +45,10 @@ using (var scope = app.Services.CreateScope())
     }
 
     context.Database.EnsureCreated();
+
+    var algoliaService = scope.ServiceProvider.GetRequiredService<IAlgoliaService>();
+
+    await algoliaService.IndexarAsync(await context.Incidencias.ToListAsync());
 }
 
 app.Run();
