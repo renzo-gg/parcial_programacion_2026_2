@@ -1,0 +1,31 @@
+# Artefactos de build: el contenedor recompila dentro de la imagen
+**/bin/
+**/obj/
+
+# Base de datos local: NUNCA se copia al contenedor.
+# El archivo se crea y se siembra solo al arrancar (EnsureCreated + HasData).
+App_Data/
+*.db
+*.db-shm
+*.db-wal
+
+# Secretos: jamas deben entrar en la imagen
+.env
+.env.*
+appsettings.Production.json
+appsettings.*.local.json
+secrets.json
+
+# Control de versiones y editor
+.git/
+.gitignore
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Documentacion y artefactos que el runtime no usa
+**/*.md
+Dockerfile
+.dockerignore

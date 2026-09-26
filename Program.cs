@@ -6,6 +6,14 @@ using ParcialProgramacion.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Render asigna el puerto de escucha mediante la variable de entorno PORT.
+// Kestrel debe enlazar a 0.0.0.0 para que el proxy de Render alcance la app.
+// Fuera de Render (dotnet run local) se respeta ASPNETCORE_HTTP_PORTS/launchSettings.
+if (int.TryParse(builder.Configuration["PORT"], out var puertoRender) && puertoRender > 0)
+{
+    builder.WebHost.UseUrls($"http://0.0.0.0:{puertoRender}");
+}
+
 builder.Services.AddControllersWithViews();
 
 builder.Services.AddSignalR();
