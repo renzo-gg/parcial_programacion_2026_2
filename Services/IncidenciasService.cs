@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using ParcialProgramacion.Data;
 using ParcialProgramacion.Models;
+using ParcialProgramacion.Models.Operaciones;
 
 namespace ParcialProgramacion.Services;
 
@@ -15,17 +16,20 @@ public class IncidenciasService : IIncidenciasService
     private readonly ApplicationDbContext _context;
     private readonly IAlgoliaService _algoliaService;
     private readonly IDistributedCache _cache;
+    private readonly IIncidenciasNotificador _notificador;
     private readonly ILogger<IncidenciasService> _logger;
 
     public IncidenciasService(
         ApplicationDbContext context,
         IAlgoliaService algoliaService,
         IDistributedCache cache,
+        IIncidenciasNotificador notificador,
         ILogger<IncidenciasService> logger)
     {
         _context = context;
         _algoliaService = algoliaService;
         _cache = cache;
+        _notificador = notificador;
         _logger = logger;
     }
 
@@ -91,11 +95,19 @@ public class IncidenciasService : IIncidenciasService
         incidencia.Estado = EstadoIncidencia.Cerrada;
         incidencia.FechaCierre = DateTime.UtcNow;
 
+        // 1) Primero se guarda el estado en la base de datos.
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Incidencia {Id} cerrada en BD", id);
 
         await InvalidarCacheListadoAsync();
+
+        // 2) Solo despues de persistir se publica el evento en tiempo real.
+        await _notificador.NotificarActualizadaAsync(new IncidenciaActualizadaDto
+        {
+            Id = incidencia.Id,
+            Estado = incidencia.Estado.ToString()
+        });
 
         return true;
     }

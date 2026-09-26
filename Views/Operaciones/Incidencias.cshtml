@@ -3,7 +3,9 @@
     ViewData["Title"] = "Incidencias";
 }
 
-<h1>Incidencias abiertas con consulta rápida</h1>
+<h1>Incidencias abiertas en tiempo real</h1>
+
+<p id="estado-conexion" class="text-muted small">Conectando al canal de tiempo real…</p>
 
 <form asp-controller="Operaciones" asp-action="Incidencias" method="get" class="mb-3" id="form-busqueda">
     <div class="input-group">
@@ -61,4 +63,61 @@ else
             }
         </tbody>
     </table>
+}
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@8.0.7/dist/browser/signalr.min.js"></script>
+    <script>
+        (function () {
+            const estadoConexion = document.getElementById('estado-conexion');
+            const conexion = new signalR.HubConnectionBuilder()
+                .withUrl('/hubs/incidencias')
+                .withAutomaticReconnect()
+                .build();
+
+            conexion.on('IncidenciaActualizada', function (dto) {
+                const fila = document.querySelector('tr[data-incidencia-id="' + dto.Id + '"]');
+
+                if (fila && dto.Estado === 'Cerrada') {
+                    fila.remove();
+                }
+
+                const restantes = document.querySelectorAll('#tabla-incidencias tbody tr').length;
+                let vacio = document.getElementById('sin-resultados');
+                const cuerpo = document.querySelector('#tabla-incidencias tbody');
+
+                if (restantes === 0 && cuerpo) {
+                    if (!vacio) {
+                        vacio = document.createElement('p');
+                        vacio.id = 'sin-resultados';
+                        vacio.textContent = 'No hay incidencias abiertas para mostrar.';
+                        cuerpo.closest('.container').querySelector('#tabla-incidencias')
+                            .parentNode.insertBefore(vacio, document.getElementById('tabla-incidencias'));
+                    }
+                }
+            });
+
+            conexion.onreconnecting(function () {
+                estadoConexion.textContent = 'Reconectando al canal de tiempo real…';
+            });
+
+            conexion.onreconnected(function () {
+                estadoConexion.textContent = 'Conectado al canal de tiempo real';
+            });
+
+            conexion.onclose(function () {
+                estadoConexion.textContent = 'Canal de tiempo real desconectado';
+            });
+
+            conexion.start()
+                .then(function () {
+                    estadoConexion.textContent = 'Conectado al canal de tiempo real';
+                    return conexion.invoke('Suscribir');
+                })
+                .catch(function (error) {
+                    estadoConexion.textContent = 'No se pudo conectar al canal de tiempo real';
+                    console.error(error);
+                });
+        })();
+    </script>
 }

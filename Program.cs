@@ -1,28 +1,44 @@
 using Microsoft.EntityFrameworkCore;
+using ParcialProgramacion.Configuration;
 using ParcialProgramacion.Data;
+using ParcialProgramacion.Hubs;
 using ParcialProgramacion.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllersWithViews();
 
+builder.Services.AddSignalR();
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("IncidenciasDb")));
 
-// Singleton: el indice en memoria debe sobrevivir entre requests.
 builder.Services.AddSingleton<IAlgoliaService, AlgoliaService>();
+
+builder.Services.AddScoped<IIncidenciasNotificador, IncidenciasNotificador>();
 
 builder.Services.AddScoped<IIncidenciasService, IncidenciasService>();
 
-var redisConnectionString = builder.Configuration["Redis:ConnectionString"]
-    ?? builder.Configuration["REDIS_CONNECTION"];
+// La cadena de Redis se resuelve desde variables de entorno o configuracion externa.
+// Nunca se escribe la contrasena en appsettings.json porque ese archivo se versiona en Git.
+// Orden de precedencia: Redis:ConnectionString, RedisConnectionString,
+// ConnectionStrings:Redis, REDIS_CONNECTION, REDIS_URL.
+var redisConnectionString = new[]
+{
+    builder.Configuration["Redis:ConnectionString"],
+    builder.Configuration["RedisConnectionString"],
+    builder.Configuration.GetConnectionString("Redis"),
+    builder.Configuration["REDIS_CONNECTION"],
+    builder.Configuration["REDIS_URL"]
+}
+.FirstOrDefault(valor => !string.IsNullOrWhiteSpace(valor));
 
 if (!string.IsNullOrWhiteSpace(redisConnectionString))
 {
     builder.Services.AddStackExchangeRedisCache(options =>
     {
-        options.Configuration = redisConnectionString;
-        options.InstanceName = "parcial:";
+        options.Configuration = RedisConfiguration.Normalizar(redisConnectionString);
+        options.InstanceName = "ExamenParcial_";
     });
 }
 else
@@ -45,6 +61,8 @@ app.UseAuthorization();
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Operaciones}/{action=Incidencias}/{id?}");
+
+app.MapHub<IncidenciasHub>(IncidenciasHub.Ruta);
 
 using (var scope = app.Services.CreateScope())
 {
