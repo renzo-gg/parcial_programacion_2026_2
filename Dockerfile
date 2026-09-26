@@ -16,20 +16,25 @@ WORKDIR /app
 # Render asigna la variable PORT. Kestrel debe escuchar en 0.0.0.0 para que
 # el proxy de Render alcance la aplicacion. El valor por defecto cubre el
 # docker run local; en Render lo sobrescribe la variable PORT real.
-ENV ASPNETCORE_HTTP_PORTS=8080 \
+# APP_UID se fija de forma explicita (es el uid del usuario "app" de la imagen
+# oficial de .NET) para no depender de que la imagen base lo exporte.
+# ASPNETCORE_HTTP_PORTS solo aplica cuando PORT no esta definido (docker run
+# local); en Render manda PORT y lo aplica Program.cs con UseUrls.
+ENV APP_UID=1654 \
+    ASPNETCORE_HTTP_PORTS=8080 \
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
     ASPNETCORE_ENVIRONMENT=Production
 
-# Directorio donde SQLite persistira la base. En Render conviene montar un
-# disco persistente en este mismo path (/var/data) para no perder los datos
-# en cada reinicio del contenedor.
-RUN mkdir -p /app/App_Data /var/data
+# Los directorios de datos deben pertenecer al usuario no root. SQLite crea el
+# archivo .db en /app/App_Data y EnsureCreated() fallaria con permisos de root.
+RUN mkdir -p /app/App_Data /var/data \
+    && chown -R ${APP_UID}:${APP_UID} /app /var/data
 
 EXPOSE 8080
 
-COPY --from=build /app/publish .
+# --chown para que los archivos publicados pertenezcan tambien al usuario final
+COPY --from=build --chown=${APP_UID}:${APP_UID} /app/publish .
 
-# Usuario no root incluido en la imagen oficial de .NET
-USER $APP_UID
+USER ${APP_UID}
 
 ENTRYPOINT ["dotnet", "ParcialProgramacion.dll"]
