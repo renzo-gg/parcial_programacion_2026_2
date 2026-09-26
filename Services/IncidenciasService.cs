@@ -7,11 +7,16 @@ namespace ParcialProgramacion.Services;
 public class IncidenciasService : IIncidenciasService
 {
     private readonly ApplicationDbContext _context;
+    private readonly IAlgoliaService _algoliaService;
     private readonly ILogger<IncidenciasService> _logger;
 
-    public IncidenciasService(ApplicationDbContext context, ILogger<IncidenciasService> logger)
+    public IncidenciasService(
+        ApplicationDbContext context,
+        IAlgoliaService algoliaService,
+        ILogger<IncidenciasService> logger)
     {
         _context = context;
+        _algoliaService = algoliaService;
         _logger = logger;
     }
 
@@ -21,6 +26,26 @@ public class IncidenciasService : IIncidenciasService
 
         return await _context.Incidencias
             .Where(i => i.Estado == EstadoIncidencia.Abierta)
+            .OrderBy(i => i.FechaApertura)
+            .ToListAsync();
+    }
+
+    public async Task<List<Incidencia>> BuscarAsync(string? texto)
+    {
+        if (string.IsNullOrWhiteSpace(texto))
+        {
+            return await GetAbiertasAsync();
+        }
+
+        var ids = await _algoliaService.BuscarIdsAsync(texto);
+
+        if (ids.Count == 0)
+        {
+            return new List<Incidencia>();
+        }
+
+        return await _context.Incidencias
+            .Where(i => ids.Contains(i.Id) && i.Estado == EstadoIncidencia.Abierta)
             .OrderBy(i => i.FechaApertura)
             .ToListAsync();
     }
